@@ -11,8 +11,13 @@
 
   .hud{position:fixed;top:20px;left:20px;z-index:10;background:rgba(10,10,20,0.85);
     backdrop-filter:blur(12px);border:1px solid rgba(100,140,255,0.15);
-    border-radius:16px;padding:20px;width:280px;user-select:none;
+    border-radius:16px;padding:20px;width:320px;user-select:none;
     box-shadow:0 8px 32px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.05)}
+  .hud-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .hud-toggle{color:#aebcda;background:transparent;border:1px solid rgba(100,140,255,.3);border-radius:6px;
+    padding:6px;font:inherit;font-size:10px;cursor:pointer;flex:none;min-height:32px}
+  button:focus-visible,input:focus-visible{outline:2px solid #a78bfa;outline-offset:4px}
+  .hud{max-width:calc(100vw - 40px);max-height:calc(100dvh - 90px);overflow-y:auto}
   .hud h1{font-size:16px;font-weight:600;margin-bottom:4px;
     background:linear-gradient(135deg,#6ea8fe,#a78bfa);-webkit-background-clip:text;
     -webkit-text-fill-color:transparent;letter-spacing:0.5px}
@@ -53,7 +58,13 @@
     padding:10px 14px;font-size:12px;font-weight:600}
   .fps-badge span{color:#34d399}
 
-  .legend{position:fixed;bottom:20px;left:20px;z-index:10;font-size:10px;color:#444;line-height:1.8}
+  .legend{position:fixed;bottom:20px;left:20px;z-index:10;font-size:10px;color:#9199ac;line-height:1.8}
+  @media (max-width:600px){
+    .hud{left:16px;top:16px;width:calc(100% - 32px);max-width:none;padding:16px}
+    .fps-badge{top:auto;bottom:16px;right:16px}
+    .legend{left:16px;bottom:16px;max-width:250px;font-size:9px}
+    .corner-info{display:none}
+  }
 </style>
 </head>
 <body>
@@ -61,7 +72,10 @@
 <canvas id="c"></canvas>
 
 <div class="hud" id="hud">
-  <h1>Particle Universe</h1>
+  <div class="hud-head">
+    <h1>Particle Universe</h1>
+    <button id="toggleControls" class="hud-toggle" type="button" aria-expanded="true" aria-controls="simulationControls">Hide controls</button>
+  </div>
   <div class="subtitle">Interactive Simulation</div>
 
   <div class="stat-row"><span class="stat-label">Particles</span><span class="stat-val blue" id="sCount">0</span></div>
@@ -69,28 +83,30 @@
   <div class="stat-row"><span class="stat-label">Avg Speed</span><span class="stat-val green" id="sSpeed">0</span></div>
   <div class="stat-row"><span class="stat-label">Entropy</span><span class="stat-val amber" id="sEntropy">0</span></div>
 
+  <div id="simulationControls">
   <div class="control-group">
-    <label>Particle Count: <span id="vCount">500</span></label>
+    <label for="rCount">Particle Count: <span id="vCount">500</span></label>
     <input type="range" id="rCount" min="50" max="2000" value="500" step="50">
 
-    <label>Gravity: <span id="vGrav">0.00</span></label>
+    <label for="rGrav">Gravity: <span id="vGrav">0.00</span></label>
     <input type="range" id="rGrav" min="0" max="100" value="0">
 
-    <label>Chaos: <span id="vChaos">20</span></label>
+    <label for="rChaos">Chaos: <span id="vChaos">20</span></label>
     <input type="range" id="rChaos" min="0" max="100" value="20">
 
-    <label>Trail Fade: <span id="vFade">97</span>%</label>
+    <label for="rFade">Trail Fade: <span id="vFade">97</span>%</label>
     <input type="range" id="rFade" min="80" max="100" value="97">
   </div>
 
   <div class="control-group">
     <label>Formation Mode</label>
     <div class="mode-btns">
-      <button class="mode-btn active" data-mode="galaxy">Galaxy</button>
-      <button class="mode-btn" data-mode="spiral">Spiral</button>
-      <button class="mode-btn" data-mode="nova">Nova</button>
-      <button class="mode-btn" data-mode="blackhole">Vortex</button>
+      <button class="mode-btn active" aria-pressed="true" data-mode="galaxy">Galaxy</button>
+      <button class="mode-btn" aria-pressed="false" data-mode="spiral">Spiral</button>
+      <button class="mode-btn" aria-pressed="false" data-mode="nova">Nova</button>
+      <button class="mode-btn" aria-pressed="false" data-mode="blackhole">Vortex</button>
     </div>
+  </div>
   </div>
 </div>
 
@@ -274,7 +290,6 @@ function draw(stats) {
   ctx.fillStyle = `rgba(10, 10, 15, ${fadeAlpha})`;
   ctx.fillRect(0, 0, W, H);
 
-  const connections = [];
   let connCount = 0;
   const connDist2 = CONNECTION_DIST * CONNECTION_DIST;
 
@@ -325,6 +340,8 @@ function draw(stats) {
       }
     }
   }
+
+  stats.connections = connCount;
 
   // Draw particles
   for (let i = 0; i < particles.length; i++) {
@@ -384,8 +401,19 @@ function updateEntropy() {
 }
 
 // Controls
+const controls = $('simulationControls');
+const controlsToggle = $('toggleControls');
+function setControls(open) {
+  controls.hidden = !open;
+  controlsToggle.setAttribute('aria-expanded', String(open));
+  controlsToggle.textContent = open ? 'Hide controls' : 'Controls';
+}
+controlsToggle.onclick = () => setControls(controls.hidden);
+setControls(!window.matchMedia?.('(max-width: 600px)').matches);
 $('rCount').oninput = function () {
   params.count = +this.value;
+  // A lower base count takes effect exactly; bursts may still add extras.
+  if (particles.length > params.count) particles.length = params.count;
   $('vCount').textContent = this.value;
 };
 $('rGrav').oninput = function () {
@@ -402,8 +430,9 @@ $('rFade').oninput = function () {
 };
 document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.onclick = function () {
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.mode-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
     this.classList.add('active');
+    this.setAttribute('aria-pressed', 'true');
     params.mode = this.dataset.mode;
     initParticles(params.count);
   };
@@ -463,6 +492,7 @@ function loop(now) {
   }
 
   stats = update();
+  draw(stats);
 
   statsTimer += dt;
   if (statsTimer > 200) {
@@ -471,7 +501,6 @@ function loop(now) {
     statsTimer = 0;
   }
 
-  draw(stats);
 }
 
 requestAnimationFrame(loop);
